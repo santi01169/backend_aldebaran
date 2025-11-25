@@ -4,8 +4,9 @@ public record ProductoResponse(
         Long id,
         String nombre,
         String descripcion,
-        String unidadMedida,
         Integer stockMinimo,
         Integer categoriaId,
-        Integer unidadMedidaId
+        Integer unidadMedidaId,
+        String categoriaNombre,
+        String unidadMedidaNombre
 ) {}

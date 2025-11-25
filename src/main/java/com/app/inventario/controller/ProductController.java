@@ -20,27 +20,47 @@ public class ProductController {
         this.service = service;
     }
 
+    // ============================
+    // LISTAR
+    // ============================
     @GetMapping
     public List<ProductoResponse> listar() {
         return service.listar();
     }
 
+    // ============================
+    // OBTENER POR ID
+    // ============================
     @GetMapping("/{id}")
     public ProductoResponse obtener(@PathVariable Long id) {
         return service.obtener(id);
     }
 
+    // ============================
+    // CREAR
+    // ============================
     @PostMapping
     public ResponseEntity<ProductoResponse> crear(@Valid @RequestBody ProductoRequest request) {
-        var creado = service.crear(request);
-        return ResponseEntity.created(URI.create("/api/productos/" + creado.id())).body(creado);
+        ProductoResponse creado = service.create(request);
+        return ResponseEntity
+                .created(URI.create("/api/productos/" + creado.id()))
+                .body(creado);
     }
 
+    // ============================
+    // ACTUALIZAR
+    // ============================
     @PutMapping("/{id}")
-    public ProductoResponse actualizar(@PathVariable Long id, @Valid @RequestBody ProductoRequest request) {
+    public ProductoResponse actualizar(
+            @PathVariable Long id,
+            @Valid @RequestBody ProductoRequest request
+    ) {
         return service.actualizar(id, request);
     }
 
+    // ============================
+    // ELIMINAR
+    // ============================
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminar(@PathVariable Long id) {
         service.eliminar(id);

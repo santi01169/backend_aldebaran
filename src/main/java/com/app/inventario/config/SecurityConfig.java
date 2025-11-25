@@ -40,14 +40,18 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authorizeHttpRequests(auth -> auth
-                        // Endpoints públicos (login, registro, swagger, etc.)
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
-                                "/api/usuarios/**"
+                                "/swagger-ui.html",
+                                "/api/usuarios/**",
+                                "/api/stock/**",
+                                "/api/proveedores/**",
+                                "/api/lotes/**"
                         ).permitAll()
-                        // Todo lo demás requiere JWT válido
+
+                        // El resto requiere autenticación
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(authenticationProvider())
@@ -55,6 +59,7 @@ public class SecurityConfig {
 
         return http.build();
     }
+
 
     @Bean
     public AuthenticationProvider authenticationProvider() {

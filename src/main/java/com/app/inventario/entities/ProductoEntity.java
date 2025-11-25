@@ -5,7 +5,7 @@ import jakarta.validation.constraints.*;
 import lombok.*;
 
 @Entity
-@Table(name = "\"Insumos\"") // la tabla existe como "Insumos"
+@Table(name = "\"Insumos\"")
 @Data @NoArgsConstructor @AllArgsConstructor
 public class ProductoEntity {
 
@@ -23,17 +23,26 @@ public class ProductoEntity {
     @Column(name = "\"Descripcion\"")
     private String descripcion;
 
-    @Size(max = 100)
-    @Column(name = "\"Unidad_de_medida\"")
-    private String unidadMedida;
-
     @Min(0)
     @Column(name = "\"Stock_minimo\"")
     private Integer stockMinimo;
 
-    @Column(name = "\"Categoria_idCategoria\"")
-    private Integer categoriaId;
+    // ❌ ELIMINA ESTOS CAMPOS:
+    // private Integer categoriaId;
+    // private Integer unidadMedidaId;
 
-    @Column(name = "\"Unidad_medida_idUnidad_medida\"")
-    private Integer unidadMedidaId;
+    // ✅ SOLO DEJA LAS RELACIONES (sin insertable/updatable false)
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(
+            name = "\"Categoria_idCategoria\"",
+            referencedColumnName = "\"idCategoria\""
+    )
+    private CategoriaEntity categoria;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(
+            name = "\"Unidad_medida_idUnidad_medida\"",
+            referencedColumnName = "\"idUnidad_medida\""
+    )
+    private UnidadMedidaEntity unidadMedida;
 }
