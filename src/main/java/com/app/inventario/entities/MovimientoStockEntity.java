@@ -2,7 +2,6 @@ package com.app.inventario.entities;
 
 import jakarta.persistence.*;
 import lombok.*;
-
 import java.time.LocalDateTime;
 
 @Getter
@@ -18,27 +17,26 @@ public class MovimientoStockEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // ENTRADA o SALIDA
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 10)
-    private TipoMovimientoStock tipo;
-
-    @Column(nullable = false)
-    private Integer cantidad;
-
-    @Column(nullable = false)
-    private Integer stockAntes;
-
-    @Column(nullable = false)
-    private Integer stockDespues;
-
-    @Column(length = 100)
-    private String motivo;
-
-    @Column(nullable = false)
+    @Column(name = "fechamovimiento")
     private LocalDateTime fechaMovimiento;
 
+    @Column(name = "stockantes")
+    private Integer stockAntes;
+
+    @Column(name = "stockdespues")
+    private Integer stockDespues;
+
+    @Column(name = "cantidad")
+    private Integer cantidad;
+
+    @Column(name = "motivo")
+    private String motivo;
+
+    @Column(name = "tipo")
+    @Enumerated(EnumType.STRING) // ⬅️ AGREGAR ESTA ANOTACIÓN
+    private TipoMovimientoStock tipo;
+
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "stock_id", nullable = false)
+    @JoinColumn(name = "stock_id")
     private StockEntity stock;
 }

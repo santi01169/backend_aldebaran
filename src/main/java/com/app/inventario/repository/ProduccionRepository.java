@@ -1,0 +1,12 @@
+package com.app.inventario.repository;
+
+import com.app.inventario.entities.ProduccionEntity;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.Optional;
+
+@Repository
+public interface ProduccionRepository extends JpaRepository<ProduccionEntity, Long> {
+    Optional<ProduccionEntity> findByOrden(String orden);
+}
