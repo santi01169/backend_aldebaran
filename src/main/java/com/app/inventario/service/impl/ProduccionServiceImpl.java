@@ -25,7 +25,7 @@ public class ProduccionServiceImpl implements ProduccionService {
     private final ProductoRepository productoRepository;
     private final StockRepository stockRepository;
     private final UsuarioRepository userRepository;
-    private final RecetaRepository recetaRepository; // ⬅️ AGREGADO
+    private final RecetaRepository recetaRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -96,9 +96,10 @@ public class ProduccionServiceImpl implements ProduccionService {
         ProduccionEntity entity = produccionRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Producción no encontrada"));
 
-        if (!"Pendiente".equals(entity.getEstado())) {
+        // ✅ MODIFICADO: Permite actualizar en Pendiente o En Proceso
+        if (!"Pendiente".equals(entity.getEstado()) && !"En Proceso".equals(entity.getEstado())) {
             throw new ResponseStatusException(BAD_REQUEST,
-                    "Solo se pueden actualizar producciones en estado Pendiente");
+                    "Solo se pueden actualizar producciones en estado Pendiente o En Proceso");
         }
 
         validarStockDisponible(request.detalles());
@@ -147,9 +148,10 @@ public class ProduccionServiceImpl implements ProduccionService {
                     "No se pueden eliminar producciones completadas porque ya descargaron el stock");
         }
 
-        // ✅ Permite eliminar: Pendiente, En Proceso, o estados inválidos (como "sesasa")
+        // ✅ Permite eliminar: Pendiente, En Proceso, o estados inválidos
         produccionRepository.deleteById(id);
     }
+
     @Override
     public ProduccionResponse completarProduccion(Long id) {
         ProduccionEntity entity = produccionRepository.findById(id)
@@ -191,8 +193,10 @@ public class ProduccionServiceImpl implements ProduccionService {
         ProduccionEntity produccion = produccionRepository.findById(produccionId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Producción no encontrada"));
 
-        if (!"Pendiente".equals(produccion.getEstado())) {
-            throw new ResponseStatusException(BAD_REQUEST, "Solo se puede modificar producción Pendiente");
+        // ✅ MODIFICADO: Permite cargar receta en Pendiente o En Proceso
+        if (!"Pendiente".equals(produccion.getEstado()) && !"En Proceso".equals(produccion.getEstado())) {
+            throw new ResponseStatusException(BAD_REQUEST,
+                    "Solo se puede modificar producción en estado Pendiente o En Proceso");
         }
 
         RecetaEntity receta = recetaRepository.findById(recetaId)
@@ -229,8 +233,10 @@ public class ProduccionServiceImpl implements ProduccionService {
         ProduccionEntity produccion = produccionRepository.findById(produccionId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Producción no encontrada"));
 
-        if (!"Pendiente".equals(produccion.getEstado())) {
-            throw new ResponseStatusException(BAD_REQUEST, "Solo se puede modificar producción Pendiente");
+        // ✅ MODIFICADO: Permite agregar producto en Pendiente o En Proceso
+        if (!"Pendiente".equals(produccion.getEstado()) && !"En Proceso".equals(produccion.getEstado())) {
+            throw new ResponseStatusException(BAD_REQUEST,
+                    "Solo se puede modificar producción en estado Pendiente o En Proceso");
         }
 
         ProductoEntity producto = productoRepository.findById(detalle.productoId())
@@ -257,9 +263,11 @@ public class ProduccionServiceImpl implements ProduccionService {
         DetalleProduccionEntity detalle = detalleProduccionRepository.findById(detalleId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Detalle no encontrado"));
 
-        if (!"Pendiente".equals(detalle.getProduccion().getEstado())) {
+        // ✅ MODIFICADO: Permite eliminar detalle en Pendiente o En Proceso
+        if (!"Pendiente".equals(detalle.getProduccion().getEstado())
+                && !"En Proceso".equals(detalle.getProduccion().getEstado())) {
             throw new ResponseStatusException(BAD_REQUEST,
-                    "No se puede modificar producción no pendiente");
+                    "No se puede modificar producción que no está en Pendiente o En Proceso");
         }
 
         detalleProduccionRepository.delete(detalle);
