@@ -134,6 +134,57 @@ public class StockServiceImpl implements StockService {
                 .toList();
     }
 
+    @Override
+    public StockResponse actualizar(Integer id, StockRequest request) {
+        StockEntity entity = stockRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Stock no encontrado"));
+
+        ProductoEntity insumo = productoRepository.findById(request.insumoId())
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Insumo no encontrado"));
+
+        if (insumo.getCategoria() == null) {
+            throw new ResponseStatusException(BAD_REQUEST, "El insumo debe tener una categoría asignada");
+        }
+
+        if (insumo.getUnidadMedida() == null) {
+            throw new ResponseStatusException(BAD_REQUEST, "El insumo debe tener una unidad de medida asignada");
+        }
+
+        entity.setInsumo(insumo);
+        entity.setCantidadActual(Math.toIntExact(request.cantidadActual()));
+        entity.setUbicacion(request.ubicacion());
+        entity.setFechaActualizacion(LocalDate.now());
+
+        if (request.loteProveedorId() != null) {
+            LoteProveedorEntity lote = loteProveedorRepository.findById(request.loteProveedorId())
+                    .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Lote no encontrado"));
+            entity.setLoteProveedor(lote);
+        } else {
+            entity.setLoteProveedor(null);
+        }
+
+        StockEntity actualizado = stockRepository.save(entity);
+        return toResponse(actualizado);
+    }
+
+    @Override
+    public void eliminar(Integer id) {
+        StockEntity entity = stockRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Stock no encontrado"));
+
+        // Verificar si tiene movimientos asociados
+        List<MovimientoStockEntity> movimientos = movimientoStockRepository
+                .findByStockOrderByFechaMovimientoDesc(entity);
+
+        if (!movimientos.isEmpty()) {
+            throw new ResponseStatusException(BAD_REQUEST,
+                    "No se puede eliminar el stock porque tiene movimientos registrados");
+        }
+
+        stockRepository.delete(entity);
+    }
+
+
     private void guardarMovimiento(
             StockEntity stock,
             TipoMovimientoStock tipo,

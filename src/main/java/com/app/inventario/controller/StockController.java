@@ -6,6 +6,7 @@ import com.app.inventario.dto.StockRequest;
 import com.app.inventario.dto.StockResponse;
 import com.app.inventario.service.StockService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -38,6 +39,22 @@ public class StockController {
     @PostMapping
     public StockResponse crearOActualizar(@Valid @RequestBody StockRequest request) {
         return service.crearOActualizar(request);
+    }
+
+    // ✅ NUEVO - Actualizar stock por ID
+    @PutMapping("/{id}")
+    public StockResponse actualizar(
+            @PathVariable Integer id,
+            @Valid @RequestBody StockRequest request
+    ) {
+        return service.actualizar(id, request);
+    }
+
+    // ✅ NUEVO - Eliminar stock
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void eliminar(@PathVariable Integer id) {
+        service.eliminar(id);
     }
 
     @PostMapping("/{id}/entrada")

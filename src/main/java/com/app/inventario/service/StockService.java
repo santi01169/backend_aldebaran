@@ -17,6 +17,10 @@ public interface StockService {
 
     StockResponse crearOActualizar(StockRequest request);
 
+    StockResponse actualizar(Integer id, StockRequest request);  // ✅ NUEVO
+
+    void eliminar(Integer id);  // ✅ NUEVO
+
     StockResponse registrarEntrada(Integer stockId, MovimientoStockRequest request);
 
     StockResponse registrarSalida(Integer stockId, MovimientoStockRequest request);
