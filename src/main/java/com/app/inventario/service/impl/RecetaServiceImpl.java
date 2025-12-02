@@ -4,7 +4,11 @@ import com.app.inventario.dto.*;
 import com.app.inventario.entities.*;
 import com.app.inventario.repository.*;
 import com.app.inventario.service.RecetaService;
+import com.app.inventario.spec.RecetaSpecifications;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -31,7 +35,6 @@ public class RecetaServiceImpl implements RecetaService {
                 .activo(request.activo())
                 .build();
 
-        // Si vienen ingredientes, agregarlos (OPCIONAL)
         if (request.ingredientes() != null && !request.ingredientes().isEmpty()) {
             for (DetalleRecetaRequest detalle : request.ingredientes()) {
                 ProductoEntity insumo = productoRepository.findById(detalle.insumoId())
@@ -78,7 +81,6 @@ public class RecetaServiceImpl implements RecetaService {
         receta.setCantidadBaseProducida(request.cantidadBaseProducida());
         receta.setActivo(request.activo());
 
-        // Actualizar ingredientes solo si vienen en el request
         if (request.ingredientes() != null) {
             receta.getIngredientes().clear();
 
@@ -109,9 +111,29 @@ public class RecetaServiceImpl implements RecetaService {
         recetaRepository.delete(receta);
     }
 
+    // ============================================================
+    // FILTRAR
+    // ============================================================
+    @Override
+    @Transactional(readOnly = true)
+    public Page<RecetaResponse> filtrar(String nombre,
+                                        Boolean activa,
+                                        Integer cantidadBaseMinima,
+                                        Pageable pageable) {
+
+        Specification<RecetaEntity> spec = (root, query, cb) -> null;
+
+        spec = spec
+                .and(RecetaSpecifications.nombreContiene(nombre))
+                .and(RecetaSpecifications.activaEs(activa))
+                .and(RecetaSpecifications.cantidadBaseMinima(cantidadBaseMinima));
+
+        return recetaRepository.findAll(spec, pageable)
+                .map(this::toResponse);
+    }
+
     // ============ NUEVOS MÉTODOS (IGUAL QUE PRODUCCIÓN) ============
 
-    // ✅ MÉTODO MODIFICADO: Suma cantidades si el insumo ya existe
     @Override
     public RecetaResponse agregarIngrediente(Long recetaId, DetalleRecetaRequest detalle) {
         RecetaEntity receta = recetaRepository.findById(recetaId)
@@ -120,18 +142,15 @@ public class RecetaServiceImpl implements RecetaService {
         ProductoEntity insumo = productoRepository.findById(detalle.insumoId())
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Insumo no encontrado"));
 
-        // ✅ NUEVO: Verificar si el insumo ya existe en la receta
         DetalleRecetaEntity ingredienteExistente = receta.getIngredientes().stream()
                 .filter(i -> i.getInsumo().getId().equals(detalle.insumoId()))
                 .findFirst()
                 .orElse(null);
 
         if (ingredienteExistente != null) {
-            // ✅ Si ya existe, SUMAR la cantidad
             int nuevaCantidad = ingredienteExistente.getCantidadRequerida() + detalle.cantidadRequerida();
             ingredienteExistente.setCantidadRequerida(nuevaCantidad);
         } else {
-            // ✅ Si NO existe, agregar nuevo ingrediente
             DetalleRecetaEntity nuevoIngrediente = DetalleRecetaEntity.builder()
                     .receta(receta)
                     .insumo(insumo)
