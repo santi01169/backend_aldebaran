@@ -4,6 +4,9 @@ import com.app.inventario.dto.ProductoRequest;
 import com.app.inventario.dto.ProductoResponse;
 import com.app.inventario.service.ProductoService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,11 +24,28 @@ public class ProductController {
     }
 
     // ============================
-    // LISTAR
+    // LISTAR (simple, sin filtros)
     // ============================
     @GetMapping
     public List<ProductoResponse> listar() {
         return service.listar();
+    }
+
+    // ============================
+    // LISTAR CON FILTROS AVANZADOS
+    // ============================
+    @GetMapping("/filtro")
+    public ResponseEntity<Page<ProductoResponse>> filtrar(
+            @RequestParam(required = false) String nombre,
+            @RequestParam(required = false) Long categoriaId,
+            @RequestParam(required = false) Long unidadMedidaId,
+            @RequestParam(required = false) Integer stockMinimo,
+            @PageableDefault(size = 20, sort = "nombre") Pageable pageable
+    ) {
+        Page<ProductoResponse> pagina = service.filtrar(
+                nombre, categoriaId, unidadMedidaId, stockMinimo, pageable
+        );
+        return ResponseEntity.ok(pagina);
     }
 
     // ============================

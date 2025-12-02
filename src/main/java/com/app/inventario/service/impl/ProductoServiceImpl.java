@@ -2,14 +2,18 @@ package com.app.inventario.service.impl;
 
 import com.app.inventario.dto.ProductoRequest;
 import com.app.inventario.dto.ProductoResponse;
-import com.app.inventario.entities.ProductoEntity;
 import com.app.inventario.entities.CategoriaEntity;
+import com.app.inventario.entities.ProductoEntity;
 import com.app.inventario.entities.UnidadMedidaEntity;
-import com.app.inventario.repository.ProductoRepository;
 import com.app.inventario.repository.CategoriaRepository;
+import com.app.inventario.repository.ProductoRepository;
 import com.app.inventario.repository.UnidadMedidaRepository;
 import com.app.inventario.service.ProductoService;
+import com.app.inventario.spec.ProductoSpecifications;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,8 +25,8 @@ import java.util.List;
 public class ProductoServiceImpl implements ProductoService {
 
     private final ProductoRepository repo;
-    private final CategoriaRepository categoriaRepo;  // ✅ AGREGAR
-    private final UnidadMedidaRepository unidadMedidaRepo;  // ✅ AGREGAR
+    private final CategoriaRepository categoriaRepo;
+    private final UnidadMedidaRepository unidadMedidaRepo;
 
     // ============================================================
     // CREATE
@@ -33,7 +37,6 @@ public class ProductoServiceImpl implements ProductoService {
         ProductoEntity entity = new ProductoEntity();
         apply(entity, request);
 
-        // guardar
         ProductoEntity saved = repo.save(entity);
 
         return toResponse(saved);
@@ -73,7 +76,6 @@ public class ProductoServiceImpl implements ProductoService {
 
         apply(e, r);
 
-        // guardar cambios
         ProductoEntity saved = repo.save(e);
 
         return toResponse(saved);
@@ -90,23 +92,43 @@ public class ProductoServiceImpl implements ProductoService {
         repo.deleteById(id);
     }
 
+    // ============================================================
+    // FILTRAR (con Specifications)
+    // ============================================================
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProductoResponse> filtrar(String nombre,
+                                          Long categoriaId,
+                                          Long unidadMedidaId,
+                                          Integer stockMinimo,
+                                          Pageable pageable) {
+
+        Specification<ProductoEntity> spec = (root, query, cb) -> null;
+
+        spec = spec
+                .and(ProductoSpecifications.nombreContiene(nombre))
+                .and(ProductoSpecifications.tieneCategoria(categoriaId))
+                .and(ProductoSpecifications.tieneUnidadMedida(unidadMedidaId))
+                .and(ProductoSpecifications.stockMinimoMayorOIgual(stockMinimo));
+
+        return repo.findAll(spec, pageable)
+                .map(this::toResponse);
+    }
 
     // ============================================================
-    // ✅ MÉTODO MODIFICADO: Buscar y asignar entidades completas
+    // Asignar datos desde el request
     // ============================================================
     private void apply(ProductoEntity e, ProductoRequest r) {
         e.setNombre(r.nombre());
         e.setDescripcion(r.descripcion());
         e.setStockMinimo(r.stockMinimo());
 
-        // ✅ Buscar y asignar la Categoría completa
         if (r.categoriaId() != null) {
             CategoriaEntity categoria = categoriaRepo.findById(r.categoriaId())
                     .orElseThrow(() -> new IllegalArgumentException("Categoría no encontrada: " + r.categoriaId()));
             e.setCategoria(categoria);
         }
 
-        // ✅ Buscar y asignar la Unidad de Medida completa
         if (r.unidadMedidaId() != null) {
             UnidadMedidaEntity unidadMedida = unidadMedidaRepo.findById(r.unidadMedidaId())
                     .orElseThrow(() -> new IllegalArgumentException("Unidad de medida no encontrada: " + r.unidadMedidaId()));
@@ -114,9 +136,8 @@ public class ProductoServiceImpl implements ProductoService {
         }
     }
 
-
     // ============================================================
-    // ✅ MÉTODO MODIFICADO: Ahora accede a los IDs desde las relaciones
+    // Mapear a DTO
     // ============================================================
     private ProductoResponse toResponse(ProductoEntity e) {
         return new ProductoResponse(
@@ -124,11 +145,10 @@ public class ProductoServiceImpl implements ProductoService {
                 e.getNombre(),
                 e.getDescripcion(),
                 e.getStockMinimo(),
-                e.getCategoria() != null ? e.getCategoria().getId() : null,  // ✅ Cambio
-                e.getUnidadMedida() != null ? e.getUnidadMedida().getId() : null,  // ✅ Cambio
+                e.getCategoria() != null ? e.getCategoria().getId() : null,
+                e.getUnidadMedida() != null ? e.getUnidadMedida().getId() : null,
                 e.getCategoria() != null ? e.getCategoria().getNombre() : null,
                 e.getUnidadMedida() != null ? e.getUnidadMedida().getNombre() : null
         );
     }
-
 }
