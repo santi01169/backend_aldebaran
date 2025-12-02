@@ -111,6 +111,7 @@ public class RecetaServiceImpl implements RecetaService {
 
     // ============ NUEVOS MÉTODOS (IGUAL QUE PRODUCCIÓN) ============
 
+    // ✅ MÉTODO MODIFICADO: Suma cantidades si el insumo ya existe
     @Override
     public RecetaResponse agregarIngrediente(Long recetaId, DetalleRecetaRequest detalle) {
         RecetaEntity receta = recetaRepository.findById(recetaId)
@@ -119,13 +120,26 @@ public class RecetaServiceImpl implements RecetaService {
         ProductoEntity insumo = productoRepository.findById(detalle.insumoId())
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Insumo no encontrado"));
 
-        DetalleRecetaEntity nuevoIngrediente = DetalleRecetaEntity.builder()
-                .receta(receta)
-                .insumo(insumo)
-                .cantidadRequerida(detalle.cantidadRequerida())
-                .build();
+        // ✅ NUEVO: Verificar si el insumo ya existe en la receta
+        DetalleRecetaEntity ingredienteExistente = receta.getIngredientes().stream()
+                .filter(i -> i.getInsumo().getId().equals(detalle.insumoId()))
+                .findFirst()
+                .orElse(null);
 
-        receta.getIngredientes().add(nuevoIngrediente);
+        if (ingredienteExistente != null) {
+            // ✅ Si ya existe, SUMAR la cantidad
+            int nuevaCantidad = ingredienteExistente.getCantidadRequerida() + detalle.cantidadRequerida();
+            ingredienteExistente.setCantidadRequerida(nuevaCantidad);
+        } else {
+            // ✅ Si NO existe, agregar nuevo ingrediente
+            DetalleRecetaEntity nuevoIngrediente = DetalleRecetaEntity.builder()
+                    .receta(receta)
+                    .insumo(insumo)
+                    .cantidadRequerida(detalle.cantidadRequerida())
+                    .build();
+
+            receta.getIngredientes().add(nuevoIngrediente);
+        }
 
         RecetaEntity guardada = recetaRepository.save(receta);
         return toResponse(guardada);
