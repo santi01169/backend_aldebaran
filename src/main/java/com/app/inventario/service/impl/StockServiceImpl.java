@@ -7,8 +7,13 @@ import com.app.inventario.dto.StockResponse;
 import com.app.inventario.entities.*;
 import com.app.inventario.repository.*;
 import com.app.inventario.service.StockService;
+import com.app.inventario.spec.StockSpecifications;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
@@ -20,6 +25,7 @@ import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class StockServiceImpl implements StockService {
 
     private final StockRepository stockRepository;
@@ -27,7 +33,11 @@ public class StockServiceImpl implements StockService {
     private final ProductoRepository productoRepository;
     private final LoteProveedorRepository loteProveedorRepository;
 
+    // ============================================================
+    // LISTAR SIMPLE
+    // ============================================================
     @Override
+    @Transactional(readOnly = true)
     public List<StockResponse> listar() {
         return stockRepository.findAll()
                 .stream()
@@ -36,6 +46,7 @@ public class StockServiceImpl implements StockService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public StockResponse obtenerPorId(Integer id) {
         StockEntity entity = stockRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Stock no encontrado"));
@@ -43,12 +54,41 @@ public class StockServiceImpl implements StockService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public StockResponse obtenerPorInsumo(Long insumoId) {
         StockEntity entity = stockRepository.findByInsumo_Id(insumoId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Stock no encontrado para el insumo"));
         return toResponse(entity);
     }
 
+    // ============================================================
+    // FILTRAR AVANZADO
+    // ============================================================
+    @Override
+    @Transactional(readOnly = true)
+    public Page<StockResponse> filtrar(Long insumoId,
+                                       String ubicacion,
+                                       Integer cantidadMin,
+                                       Integer cantidadMax,
+                                       Boolean sinStock,
+                                       Pageable pageable) {
+
+        Specification<StockEntity> spec = (root, query, cb) -> null;
+
+        spec = spec
+                .and(StockSpecifications.porInsumoId(insumoId))
+                .and(StockSpecifications.ubicacionContiene(ubicacion))
+                .and(StockSpecifications.cantidadMinima(cantidadMin))
+                .and(StockSpecifications.cantidadMaxima(cantidadMax))
+                .and(StockSpecifications.sinStock(sinStock));
+
+        return stockRepository.findAll(spec, pageable)
+                .map(this::toResponse);
+    }
+
+    // ============================================================
+    // CREAR / ACTUALIZAR
+    // ============================================================
     @Override
     public StockResponse crearOActualizar(StockRequest request) {
         ProductoEntity insumo = productoRepository.findById(request.insumoId())
@@ -83,55 +123,6 @@ public class StockServiceImpl implements StockService {
 
         StockEntity guardado = stockRepository.save(entity);
         return toResponse(guardado);
-    }
-
-    @Override
-    public StockResponse registrarEntrada(Integer stockId, MovimientoStockRequest request) {
-        StockEntity entity = stockRepository.findById(stockId)
-                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Stock no encontrado"));
-
-        int antes = entity.getCantidadActual();
-        int despues = antes + request.cantidad();
-
-        entity.setCantidadActual(despues);
-        entity.setFechaActualizacion(LocalDate.now());
-        stockRepository.save(entity);
-
-        guardarMovimiento(entity, TipoMovimientoStock.ENTRADA, request, antes, despues);
-
-        return toResponse(entity);
-    }
-
-    @Override
-    public StockResponse registrarSalida(Integer stockId, MovimientoStockRequest request) {
-        StockEntity entity = stockRepository.findById(stockId)
-                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Stock no encontrado"));
-
-        int antes = entity.getCantidadActual();
-        int despues = antes - request.cantidad();
-
-        if (despues < 0) {
-            throw new ResponseStatusException(BAD_REQUEST, "No hay suficiente stock para la salida");
-        }
-
-        entity.setCantidadActual(despues);
-        entity.setFechaActualizacion(LocalDate.now());
-        stockRepository.save(entity);
-
-        guardarMovimiento(entity, TipoMovimientoStock.SALIDA, request, antes, despues);
-
-        return toResponse(entity);
-    }
-
-    @Override
-    public List<MovimientoStockResponse> listarMovimientos(Integer stockId) {
-        StockEntity entity = stockRepository.findById(stockId)
-                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Stock no encontrado"));
-
-        return movimientoStockRepository.findByStockOrderByFechaMovimientoDesc(entity)
-                .stream()
-                .map(this::toMovimientoResponse)
-                .toList();
     }
 
     @Override
@@ -172,7 +163,6 @@ public class StockServiceImpl implements StockService {
         StockEntity entity = stockRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Stock no encontrado"));
 
-        // Eliminar todos los movimientos asociados primero
         List<MovimientoStockEntity> movimientos = movimientoStockRepository
                 .findByStockOrderByFechaMovimientoDesc(entity);
 
@@ -180,12 +170,65 @@ public class StockServiceImpl implements StockService {
             movimientoStockRepository.deleteAll(movimientos);
         }
 
-        // Ahora eliminar el stock
         stockRepository.delete(entity);
     }
 
+    // ============================================================
+    // MOVIMIENTOS
+    // ============================================================
+    @Override
+    public StockResponse registrarEntrada(Integer stockId, MovimientoStockRequest request) {
+        StockEntity entity = stockRepository.findById(stockId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Stock no encontrado"));
 
+        int antes = entity.getCantidadActual();
+        int despues = antes + request.cantidad();
 
+        entity.setCantidadActual(despues);
+        entity.setFechaActualizacion(LocalDate.now());
+        stockRepository.save(entity);
+
+        guardarMovimiento(entity, TipoMovimientoStock.ENTRADA, request, antes, despues);
+
+        return toResponse(entity);
+    }
+
+    @Override
+    public StockResponse registrarSalida(Integer stockId, MovimientoStockRequest request) {
+        StockEntity entity = stockRepository.findById(stockId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Stock no encontrado"));
+
+        int antes = entity.getCantidadActual();
+        int despues = antes - request.cantidad();
+
+        if (despues < 0) {
+            throw new ResponseStatusException(BAD_REQUEST, "No hay suficiente stock para la salida");
+        }
+
+        entity.setCantidadActual(despues);
+        entity.setFechaActualizacion(LocalDate.now());
+        stockRepository.save(entity);
+
+        guardarMovimiento(entity, TipoMovimientoStock.SALIDA, request, antes, despues);
+
+        return toResponse(entity);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MovimientoStockResponse> listarMovimientos(Integer stockId) {
+        StockEntity entity = stockRepository.findById(stockId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Stock no encontrado"));
+
+        return movimientoStockRepository.findByStockOrderByFechaMovimientoDesc(entity)
+                .stream()
+                .map(this::toMovimientoResponse)
+                .toList();
+    }
+
+    // ============================================================
+    // PRIVADOS
+    // ============================================================
     private void guardarMovimiento(
             StockEntity stock,
             TipoMovimientoStock tipo,

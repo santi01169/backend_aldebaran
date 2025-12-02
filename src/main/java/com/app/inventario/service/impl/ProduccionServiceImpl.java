@@ -4,7 +4,11 @@ import com.app.inventario.dto.*;
 import com.app.inventario.entities.*;
 import com.app.inventario.repository.*;
 import com.app.inventario.service.ProduccionService;
+import com.app.inventario.spec.ProduccionSpecifications;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -27,6 +31,9 @@ public class ProduccionServiceImpl implements ProduccionService {
     private final UsuarioRepository userRepository;
     private final RecetaRepository recetaRepository;
 
+    // ============================================================
+    // LISTAR
+    // ============================================================
     @Override
     @Transactional(readOnly = true)
     public List<ProduccionResponse> listar() {
@@ -36,6 +43,9 @@ public class ProduccionServiceImpl implements ProduccionService {
                 .toList();
     }
 
+    // ============================================================
+    // OBTENER POR ID
+    // ============================================================
     @Override
     @Transactional(readOnly = true)
     public ProduccionResponse obtenerPorId(Long id) {
@@ -44,21 +54,21 @@ public class ProduccionServiceImpl implements ProduccionService {
         return toResponse(entity);
     }
 
+    // ============================================================
+    // CREAR
+    // ============================================================
     @Override
     public ProduccionResponse crear(ProduccionRequest request) {
-        // Validar orden duplicada
         if (produccionRepository.findByOrden(request.orden()).isPresent()) {
             throw new ResponseStatusException(BAD_REQUEST, "Orden duplicada");
         }
 
-        // Buscar usuario
         UsuarioEntity usuario = null;
         if (request.usuarioResponsableId() != null) {
             usuario = userRepository.findById(request.usuarioResponsableId())
                     .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Usuario no encontrado"));
         }
 
-        // Crear producción SIN validar stock (porque no hay detalles aún)
         ProduccionEntity produccion = ProduccionEntity.builder()
                 .orden(request.orden())
                 .cantidadAProducir(request.cantidadAProducir())
@@ -68,7 +78,6 @@ public class ProduccionServiceImpl implements ProduccionService {
                 .observacion(request.observacion())
                 .build();
 
-        // Si vienen detalles, agregarlos
         if (request.detalles() != null && !request.detalles().isEmpty()) {
             validarStockDisponible(request.detalles());
 
@@ -91,12 +100,14 @@ public class ProduccionServiceImpl implements ProduccionService {
         return toResponse(guardada);
     }
 
+    // ============================================================
+    // ACTUALIZAR
+    // ============================================================
     @Override
     public ProduccionResponse actualizar(Long id, ProduccionRequest request) {
         ProduccionEntity entity = produccionRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Producción no encontrada"));
 
-        // ✅ MODIFICADO: Permite actualizar en Pendiente o En Proceso
         if (!"Pendiente".equals(entity.getEstado()) && !"En Proceso".equals(entity.getEstado())) {
             throw new ResponseStatusException(BAD_REQUEST,
                     "Solo se pueden actualizar producciones en estado Pendiente o En Proceso");
@@ -137,21 +148,25 @@ public class ProduccionServiceImpl implements ProduccionService {
         return toResponse(guardada);
     }
 
+    // ============================================================
+    // ELIMINAR
+    // ============================================================
     @Override
     public void eliminar(Long id) {
         ProduccionEntity entity = produccionRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Producción no encontrada"));
 
-        // ✅ SOLUCIÓN 2: Solo impide eliminar si ya está completada (stock descontado)
         if ("Completada".equals(entity.getEstado())) {
             throw new ResponseStatusException(BAD_REQUEST,
                     "No se pueden eliminar producciones completadas porque ya descargaron el stock");
         }
 
-        // ✅ Permite eliminar: Pendiente, En Proceso, o estados inválidos
         produccionRepository.deleteById(id);
     }
 
+    // ============================================================
+    // COMPLETAR PRODUCCIÓN
+    // ============================================================
     @Override
     public ProduccionResponse completarProduccion(Long id) {
         ProduccionEntity entity = produccionRepository.findById(id)
@@ -171,7 +186,6 @@ public class ProduccionServiceImpl implements ProduccionService {
                 .toList();
         validarStockDisponible(detalles);
 
-        // Descontar del stock
         for (DetalleProduccionEntity detalle : entity.getDetalles()) {
             StockEntity stock = stockRepository.findByInsumo_Id(detalle.getProducto().getId())
                     .orElseThrow(() -> new ResponseStatusException(NOT_FOUND,
@@ -188,12 +202,39 @@ public class ProduccionServiceImpl implements ProduccionService {
         return toResponse(guardada);
     }
 
+    // ============================================================
+    // FILTRAR
+    // ============================================================
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProduccionResponse> filtrar(String orden,
+                                            String estado,
+                                            LocalDate fechaDesde,
+                                            LocalDate fechaHasta,
+                                            Long usuarioResponsableId,
+                                            Pageable pageable) {
+
+        Specification<ProduccionEntity> spec = (root, query, cb) -> null;
+
+        spec = spec
+                .and(ProduccionSpecifications.ordenContiene(orden))
+                .and(ProduccionSpecifications.estadoEs(estado))
+                .and(ProduccionSpecifications.fechaDesde(fechaDesde))
+                .and(ProduccionSpecifications.fechaHasta(fechaHasta))
+                .and(ProduccionSpecifications.usuarioResponsableId(usuarioResponsableId));
+
+        return produccionRepository.findAll(spec, pageable)
+                .map(this::toResponse);
+    }
+
+    // ============================================================
+    // RECETAS Y DETALLES
+    // ============================================================
     @Override
     public ProduccionResponse agregarDetallesDesdeReceta(Long produccionId, Long recetaId) {
         ProduccionEntity produccion = produccionRepository.findById(produccionId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Producción no encontrada"));
 
-        // ✅ MODIFICADO: Permite cargar receta en Pendiente o En Proceso
         if (!"Pendiente".equals(produccion.getEstado()) && !"En Proceso".equals(produccion.getEstado())) {
             throw new ResponseStatusException(BAD_REQUEST,
                     "Solo se puede modificar producción en estado Pendiente o En Proceso");
@@ -202,7 +243,6 @@ public class ProduccionServiceImpl implements ProduccionService {
         RecetaEntity receta = recetaRepository.findById(recetaId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Receta no encontrada"));
 
-        // Agregar todos los ingredientes de la receta
         for (DetalleRecetaEntity ingrediente : receta.getIngredientes()) {
             DetalleProduccionEntity detalle = DetalleProduccionEntity.builder()
                     .produccion(produccion)
@@ -214,7 +254,6 @@ public class ProduccionServiceImpl implements ProduccionService {
             produccion.getDetalles().add(detalle);
         }
 
-        // Validar stock con los nuevos detalles
         List<DetalleProduccionRequest> detallesValidar = produccion.getDetalles().stream()
                 .map(d -> new DetalleProduccionRequest(
                         d.getProducto().getId(),
@@ -233,7 +272,6 @@ public class ProduccionServiceImpl implements ProduccionService {
         ProduccionEntity produccion = produccionRepository.findById(produccionId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Producción no encontrada"));
 
-        // ✅ MODIFICADO: Permite agregar producto en Pendiente o En Proceso
         if (!"Pendiente".equals(produccion.getEstado()) && !"En Proceso".equals(produccion.getEstado())) {
             throw new ResponseStatusException(BAD_REQUEST,
                     "Solo se puede modificar producción en estado Pendiente o En Proceso");
@@ -242,7 +280,6 @@ public class ProduccionServiceImpl implements ProduccionService {
         ProductoEntity producto = productoRepository.findById(detalle.productoId())
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Producto no encontrado"));
 
-        // Validar stock del nuevo producto
         validarStockDisponible(List.of(detalle));
 
         DetalleProduccionEntity nuevoDetalle = DetalleProduccionEntity.builder()
@@ -263,7 +300,6 @@ public class ProduccionServiceImpl implements ProduccionService {
         DetalleProduccionEntity detalle = detalleProduccionRepository.findById(detalleId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Detalle no encontrado"));
 
-        // ✅ MODIFICADO: Permite eliminar detalle en Pendiente o En Proceso
         if (!"Pendiente".equals(detalle.getProduccion().getEstado())
                 && !"En Proceso".equals(detalle.getProduccion().getEstado())) {
             throw new ResponseStatusException(BAD_REQUEST,
@@ -273,9 +309,9 @@ public class ProduccionServiceImpl implements ProduccionService {
         detalleProduccionRepository.delete(detalle);
     }
 
-    /**
-     * MÉTODO CRÍTICO: Valida que haya suficiente stock para todos los insumos
-     */
+    // ============================================================
+    // VALIDAR STOCK
+    // ============================================================
     private void validarStockDisponible(List<DetalleProduccionRequest> detalles) {
         StringBuilder errores = new StringBuilder();
 
@@ -309,6 +345,9 @@ public class ProduccionServiceImpl implements ProduccionService {
         }
     }
 
+    // ============================================================
+    // MAPEADOR
+    // ============================================================
     private ProduccionResponse toResponse(ProduccionEntity e) {
         List<DetalleProduccionResponse> detalles = e.getDetalles().stream()
                 .map(d -> new DetalleProduccionResponse(
