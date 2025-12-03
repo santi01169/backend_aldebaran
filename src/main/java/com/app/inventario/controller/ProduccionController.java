@@ -1,3 +1,6 @@
+package com.app.inventario.controller;
+
+import com.app.inventario.dto.ProduccionRequest;
 import com.app.inventario.dto.ProduccionResponse;
 import com.app.inventario.service.ProduccionService;
 import org.springframework.data.domain.Page;
@@ -8,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/produccion")
@@ -19,7 +23,10 @@ public class ProduccionController {
         this.produccionService = produccionService;
     }
 
-    // ... tus endpoints actuales (listar, crear, etc.)
+    @GetMapping
+    public List<ProduccionResponse> listar() {
+        return produccionService.listar();
+    }
 
     @GetMapping("/filtro")
     public ResponseEntity<Page<ProduccionResponse>> filtrar(
@@ -35,5 +42,10 @@ public class ProduccionController {
         Page<ProduccionResponse> pagina = produccionService.filtrar(
                 orden, estado, fechaDesde, fechaHasta, usuarioResponsableId, pageable);
         return ResponseEntity.ok(pagina);
+    }
+
+    @PostMapping
+    public ProduccionResponse crear(@RequestBody ProduccionRequest request) {
+        return produccionService.crear(request);
     }
 }
