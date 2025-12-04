@@ -47,13 +47,14 @@ public class UsuarioEntity implements UserDetails {
     @Column(name = "\"Rol\"", nullable = true)
     private String rol;
 
-    @ManyToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
+    @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
-            name = "user_roles",    // evita "user-roles" con guion
+            name = "user_roles",
             joinColumns = @JoinColumn(name = "user_id"),
             inverseJoinColumns = @JoinColumn(name = "role_id")
     )
     private Set<RoleEntity> roles = new HashSet<>();
+
 
     // ================= UserDetails =================
 
