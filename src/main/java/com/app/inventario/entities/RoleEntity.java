@@ -12,7 +12,7 @@ import java.util.Set;
 @Entity
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "\"roles\"")
+@Table(name = "roles")  // <- sin comillas escapadas
 public class RoleEntity {
 
     @Id
@@ -23,6 +23,6 @@ public class RoleEntity {
     @Enumerated(EnumType.STRING)
     private RoleEnum roleEnum;
 
-    @ManyToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
+    @ManyToMany(fetch = FetchType.EAGER)  // <- sin cascade = CascadeType.ALL
     private Set<PermisionEntity> permisionList = new HashSet<>();
 }
