@@ -23,7 +23,8 @@ public interface StockRepository extends JpaRepository<StockEntity, Integer>,
     List<StockEntity> findByInsumo_IdOrderByLoteProveedor_FechaVencimientoAsc(Long insumoId);
 
     @Query("SELECT s FROM StockEntity s " +
-            "WHERE s.cantidadActual <= s.insumo.stockMinimo " +
+            "WHERE s.cantidadActual > 0 " +
+            "AND s.cantidadActual <= s.insumo.stockMinimo " +
             "ORDER BY s.cantidadActual ASC")
     List<StockEntity> findProductosConStockBajo();
 
